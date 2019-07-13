@@ -13,49 +13,27 @@ check() {
         fi
 }
 vIP() {
-# If you don't have a static ip and you are behind nat wrote your ip here and remove IP=`curl -s api.ipify.org` ex
-#IP=123.123.123.123
-IP=`curl -s api.ipify.org`
-        if grep -q "^${IP//./\.}$" < <(dig +short $1); then
-            echo ""
-        else
-            echo "The Domain $1 Doesn't Resolve your server ip ($IP)"
-            exit 1
-        fi
-        if grep -q "^${IP//./\.}$" < <(dig +short www.$1); then
-            echo ""
-        else
-            echo "The RECORD www.$1 Doesn't Resolve your server ip ($IP)"
-            exit 1
-        fi
+if [ -f "/root/.cf.ini" ]; then
+else 
+    echo "Please put your clouflare api into /root/.cf.ini https://certbot-dns-cloudflare.readthedocs.io/en/stable/"
+    exit 1
+fi
 }
 
 genit() {
-        echo -e "|======================|" | lolcat -a -s 100;
-        echo -e "| ROOT CHECK      : OK |"
-        echo -e "| DOMAIN IP CHECK : OK |"
-        echo -e "|======================|" | lolcat -a -s 100;
-        echo -e "Sleeping for 5sec and generating ssl!"
-        sleep 5
-        service nginx stop
-        service apache2 stop
-        rm -Rf /etc/letsencrypt/archive/$1
-        rm -Rf /etc/letsencrypt/live/$1
-        rm -Rf /etc/letsencrypt/renewal/$1.conf
         clear
-        /ssl/letsencrypt/letsencrypt-auto certonly --standalone -d $1 -d www.$1
-        mkdir -p /hostdata/$1/ssl
-        cp /ssl/dh2048.pem /hostdata/$1/ssl/
-        cp /etc/letsencrypt/live/$1/* /hostdata/$1/ssl/
-        clear
+        echo -e "|=======================|" | lolcat -a -s 100;
+        echo -e "| ROOT CHECK       : OK |"
+        echo -e "| CLOUDFLARE CHECK : OK |"
+        echo -e "|=======================|" | lolcat -a -s 100;
+        certbot certonly --dns-cloudflare --dns-cloudflare-credentials ~/.cf.ini -d *.$1
+        if [ -d "/etc/letsencrypt/live/$1" ]; then
+          echo "Your wildcard was generated and stored @ /etc/letsencrypt/live/$1"
+        else
+          echo "Something went wrong please scroll up and read certbot logs"
+        fi
 }
 
 if [ "$1" == 'gen-ssl' ] && [ "$2" ]; then
       check $2; vIP $2; genit $2;
-      clear
-      echo -e "Certificate Is Generated And Stored At" | lolcat -a -s 100;
-      echo -e "/hostdata/$2/ssl/fullchain.pem" | lolcat -a -s 100;
-      echo -e "/hostdata/$2/ssl/privkey.pem" | lolcat -a -s 100;
-      echo -e "As symlink. Real path is at /etc/letsencrypt/archive/$2/" | lolcat -a -s 100;
-      echo -e "You can add ssl to your vhost config file and restart webserver !" | lolcat -a -s 100;
 fi
